@@ -391,125 +391,6 @@
 #     main()
 
 ########################################################
-# main.py after moving ymodule to input 
-# import logging
-# from Models.training import train_one_epoch, evaluate, plot_predictions, plot_loss_curve
-# from Models.visualize_matrices import save_and_plot_matrices
-# import seaborn as sns
-# import torch
-# import torch.nn as nn
-# import torch.optim as optim
-# import matplotlib.pyplot as plt
-# import numpy as np
-# import os
-# import sys
-# sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-# from torch.utils.data import DataLoader, random_split
-# from Data.dataset import PixelClusterDataset
-# from Models.s4network import S4PredictionNetwork
-
-# logging.basicConfig(
-#     level=logging.DEBUG,
-#     format="%(asctime)s [%(levelname)s] %(message)s",
-#     handlers=[
-#         logging.FileHandler("logs/debug.log", mode='w'),
-#         logging.StreamHandler(sys.stdout)
-#     ]
-# )
-
-# def main():
-#     logging.info("Starting main training pipeline...")
-#     data_dir = "preprocessed_data"
-#     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#     logging.info(f"Using device: {device}")
-
-#     full_dataset = PixelClusterDataset(data_dir, device=device)
-#     total_size = len(full_dataset)
-#     train_size = int(0.7 * total_size)
-#     val_size = int(0.1 * total_size)
-#     test_size = total_size - train_size - val_size
-#     logging.info(f"Dataset split - Train: {train_size}, Val: {val_size}, Test: {test_size}")
-
-#     train_dataset, val_dataset, test_dataset = random_split(full_dataset, [train_size, val_size, test_size])
-#     train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True)
-#     val_loader = DataLoader(val_dataset, batch_size=64)
-#     test_loader = DataLoader(test_dataset, batch_size=64)
-
-#     model = S4PredictionNetwork(
-#         input_dim=274,  # Updated for promoted target
-#         hidden_output_dim=128,
-#         final_output_dim=8  # One target moved to input
-#     ).to(device)
-#     logging.info("Model initialized.")
-
-#     criterion = nn.MSELoss()
-#     optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
-#     logging.info("Loss function and optimizer configured.")
-
-#     NUM_EPOCHS = 50
-#     PATIENCE = 7
-#     best_val_loss = float('inf')
-#     patience_counter = 0
-
-#     train_losses = []
-#     val_losses = []
-
-#     for epoch in range(1, NUM_EPOCHS + 1):
-#         logging.info(f"Epoch {epoch} starting...")
-#         train_loss = train_one_epoch(model, train_loader, criterion, optimizer, device)
-#         val_loss, val_preds, val_targets = evaluate(model, val_loader, criterion, device)
-#         plot_predictions(val_preds, val_targets, save_path=f"logs/val_pred_vs_target_epoch{epoch}.png")
-#         train_losses.append(train_loss)
-#         val_losses.append(val_loss)
-
-#         if val_loss < best_val_loss:
-#             best_val_loss = val_loss
-#             patience_counter = 0
-#             torch.save(model.state_dict(), "logs/best_model.pt")
-#             logging.info(f"New best model saved with val_loss {val_loss:.4f}")
-#         else:
-#             patience_counter += 1
-#             logging.info(f"Early stopping counter: {patience_counter}/{PATIENCE}")
-#             if patience_counter >= PATIENCE:
-#                 logging.info("Early stopping triggered.")
-#                 break
-
-#     plot_loss_curve(train_losses, val_losses, save_path="logs/loss_curve.png")
-
-#     logging.info("Evaluating on test set...")
-#     model.load_state_dict(torch.load("logs/best_model.pt"))
-#     test_loss, test_preds, test_targets = evaluate(model, test_loader, criterion, device)
-#     plot_predictions(test_preds, test_targets, save_path="logs/test_pred_vs_target.png")
-#     logging.info(f"Final Test Loss: {test_loss:.4f}")
-
-#     torch.save(model.state_dict(), "logs/final_model.pt")
-#     logging.info("Final model saved to logs/final_model.pt")
-
-#     save_and_plot_matrices(model, output_dir="logs/matrices")
-#     logging.info("Saved A, B, C matrices and visualizations to logs/matrices")
-
-#     with torch.no_grad():
-#         s4 = model.s4_layer
-#         A_masked = (s4.A * s4.A_mask).detach().cpu()
-#         B_masked = (s4.B * s4.B_mask).detach().cpu()
-#         C_masked = (s4.C * s4.C_mask).detach().cpu()
-
-#         def log_matrix_stats(name, mat):
-#             density = (mat != 0).float().mean().item()
-#             mean_val = mat.mean().item()
-#             std_val = mat.std().item()
-#             logging.info(f"{name} stats — shape: {mat.shape}, density: {density:.4f}, mean: {mean_val:.6f}, std: {std_val:.6f}")
-
-#         log_matrix_stats("A_masked", A_masked)
-#         log_matrix_stats("B_masked", B_masked)
-#         log_matrix_stats("C_masked", C_masked)
-
-#     logging.info("Training complete.")
-
-# if __name__ == "__main__":
-#     main()
-
-########################################################
 
 # main.py after accommodating new input/target dimensions
 # main.py (with more evaluations)
@@ -569,6 +450,11 @@ def main():
         logging.error(f"Dataset too small ({total_size} samples) to split. Need at least 3.")
         return
 
+    SEED = 42
+    generator = torch.Generator().manual_seed(SEED) # Create a generator with a fixed seed
+    logging.info(f"Using random seed {SEED} for dataset split.")
+
+    # Calculate splits
     train_size = int(0.7 * total_size)
     val_size = int(0.15 * total_size)
     test_size = total_size - train_size - val_size
@@ -587,7 +473,7 @@ def main():
             return
 
     logging.info(f"Dataset split - Total:{total_size}, Train:{train_size}, Val:{val_size}, Test:{test_size}")
-    train_dataset, val_dataset, test_dataset = random_split(full_dataset, [train_size, val_size, test_size])
+    train_dataset, val_dataset, test_dataset = random_split(full_dataset, [train_size, val_size, test_size], generator=generator)
     
     # DataLoader uses num_workers=2, which triggers multiprocessing
     train_loader = DataLoader(train_dataset, batch_size=64, shuffle=True, num_workers=2, pin_memory=device.type == 'cuda')

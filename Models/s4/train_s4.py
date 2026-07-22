@@ -202,7 +202,7 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader, random_split
 from Data.dataset import PixelClusterDataset
-from Models.s4network import S4PredictionNetwork
+from Models.s4.s4network import S4PredictionNetwork
 import logging
 import os
 import sys
